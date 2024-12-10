@@ -3,39 +3,52 @@ import boto3
 import json
 import pandas as pd
 import requests
+import os
 
-session = boto3.Session(profile_name="iaedn")
+session = boto3.Session(
+    aws_access_key_id='AKIAZOZQF2ANIEVMVJ7H',
+    aws_secret_access_key='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',
+    region_name='us-west-2'  
+)
 client = session.client('bedrock-runtime', region_name='us-west-2')
 
-# =========================
-# Função para chamada à API pública do IBGE
-# =========================
-def get_ibge_info(name):
-    try:
-        response = requests.get(f"https://servicodados.ibge.gov.br/api/v2/censos/nomes/{name}")
-        st.write("**Retorno Bruto da API IBGE:**")
-        st.json(response.json())
 
-        if response.status_code == 200:
-            data = response.json()
-            if data and isinstance(data, list) and "res" in data[0]:
-                name_data = data[0]
-                resumo = f"Nome: {name_data['nome']}\nLocalidade: {name_data['localidade']}\n"
-                resumo += "Frequências por período:\n"
-                for periodo in name_data["res"]:
-                    resumo += f"Período {periodo['periodo']}: {periodo['frequencia']} ocorrências\n"
-                return resumo
-            else:
-                return f"Resultado para {name}: Nenhuma informação encontrada ou formato inesperado."
-        else:
-            return f"Erro ao acessar a API do IBGE: {response.status_code}"
+# =========================
+# Função para carregar arquivo
+# =========================
+def carregar_eventos(caminho_arquivo):
+    try:
+        # Tenta múltiplos caminhos
+        possiveis_caminhos = [
+            caminho_arquivo,
+            os.path.join(os.path.expanduser('~'), 'Desktop', 'turist-a.i', 'eventos-buzios.txt'),
+            os.path.join(os.getcwd(), 'eventos-buzios.txt')
+        ]
+        
+        for caminho in possiveis_caminhos:
+            if os.path.exists(caminho):
+                with open(caminho, 'r', encoding='utf-8') as arquivo:
+                    return arquivo.read()
+        
+        raise FileNotFoundError("Arquivo não encontrado em nenhum dos caminhos tentados")
+    
     except Exception as e:
-        return f"Erro ao acessar a API do IBGE: {str(e)}"
+        st.error(f"Erro ao ler o arquivo: {e}")
+        return ""
 
 # =========================
 # Função para chamada ao AWS Bedrock
 # =========================
 def call_bedrock_model(messages):
+    
+    # Carrega os eventos de Búzios
+    caminho_eventos = os.path.join(os.path.expanduser('~'), 'Desktop', 'turist-a.i', 'eventos-buzios.txt')
+    eventos = carregar_eventos(caminho_eventos)
+    
+    # Adiciona os eventos ao contexto do primeiro prompt
+    if messages and messages[0]["role"] == "user":
+        messages[0]["content"] += f"\n\nEventos em Búzios:\n{eventos}"
+    
     payload = {
         "messages": [{"role": msg["role"], "content": msg["content"]} for msg in messages],
         "max_tokens": 200000,
@@ -75,22 +88,24 @@ st.title("Chat com AWS Bedrock")
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
     context = """
-    Bem-vindo! Você está interagindo com o assistente da empresa SuperNanny.
-    Somos líderes em atendimento por babás.
-    Posso ajudá-lo com informações sobre nossos produtos, serviços ou outras dúvidas.
-
-    *Prompt*: Para bebês até 3 meses - 100,00 a hora, para bebês até 6 meses - 150 reais a hora e a partir de 1 ano - 200,00 a hora. Faça perguntas para o usuário final.
-    Como se fosse um cadastro final, induza a venda, mas tire dúvidas. Você só atende cidades de Minas Gerais e vai cobrar 1,00 a cada km de Belo Horizonte de deslocamen.
-    Pergunte o nome da pessoa, idade, quantos filhos, etc...
-
-    Faça pergunta por pergunta, não envie muitas perguntas. Seja cordial, envie emojis fofos (infantis). 
+    
+    *Prompt*: A minha empresa se chama TURIST A.I. Você é um agente de viagens virtual, invente um nome para você a cada interação, e diga que você é da Turist A.I. 
+Utilizando uma linguagem cordial e que seja objetiva, com emojis. Faça ao usuário, as perguntas necessárias para responder às questões abaixo:
+   pergunte que dia ele irá para búzios
+    Tipo de evento :
+    Gêneros musicais favoritos :
+    Atividades preferidas
+ 
+Com base nas informações fornecidas pelo usuário, personalize sugestões de eventos, músicas e atividades na cidade de Buzios, baseada nos dados do arquivo eventos-buzios.txt. fale também sobre o tempo, 
+Considere os seguintes, quero que faça uma pergunta por vez, como em uma conversa.
     
     """
-    st.session_state.chat_history.append({"role": "user", "content": context})
+    
+    st.session_state.chat_history.append({"role": "user", "content": context, "hidden": True})
 
 user_input = st.text_area("Digite sua mensagem ou personalize o prompt:", key="user_input")
 
-def add_message_to_history(role, content, hidden=False):
+def add_message_to_history(role, content, ):
     if not hidden:
         if not st.session_state.chat_history or st.session_state.chat_history[-1]["role"] != role:
             st.session_state.chat_history.append({"role": role, "content": content})
