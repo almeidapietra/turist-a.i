@@ -5,12 +5,21 @@ import pandas as pd
 import requests
 import os
 
+
+
+
 session = boto3.Session(
-    aws_access_key_id='AKIAZOZQF2ANIEVMVJ7H',
-    aws_secret_access_key='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',
+    aws_access_key_id='',
+    aws_secret_access_key='',
     region_name='us-west-2'  
 )
 client = session.client('bedrock-runtime', region_name='us-west-2')
+
+
+
+
+
+
 
 
 # =========================
@@ -24,31 +33,38 @@ def carregar_eventos(caminho_arquivo):
             os.path.join(os.path.expanduser('~'), 'Desktop', 'turist-a.i', 'eventos-buzios.txt'),
             os.path.join(os.getcwd(), 'eventos-buzios.txt')
         ]
-        
+       
         for caminho in possiveis_caminhos:
             if os.path.exists(caminho):
                 with open(caminho, 'r', encoding='utf-8') as arquivo:
                     return arquivo.read()
-        
+       
         raise FileNotFoundError("Arquivo não encontrado em nenhum dos caminhos tentados")
-    
+   
     except Exception as e:
         st.error(f"Erro ao ler o arquivo: {e}")
         return ""
+
+
+
 
 # =========================
 # Função para chamada ao AWS Bedrock
 # =========================
 def call_bedrock_model(messages):
-    
+   
     # Carrega os eventos de Búzios
     caminho_eventos = os.path.join(os.path.expanduser('~'), 'Desktop', 'turist-a.i', 'eventos-buzios.txt')
     eventos = carregar_eventos(caminho_eventos)
-    
+   
+    if not eventos:
+        eventos = "Nnehum evento em Búzios no Momento"
+
+
     # Adiciona os eventos ao contexto do primeiro prompt
     if messages and messages[0]["role"] == "user":
         messages[0]["content"] += f"\n\nEventos em Búzios:\n{eventos}"
-    
+   
     payload = {
         "messages": [{"role": msg["role"], "content": msg["content"]} for msg in messages],
         "max_tokens": 200000,
@@ -57,6 +73,9 @@ def call_bedrock_model(messages):
         "top_p": 0.95,
         "stop_sequences": []
     }
+
+
+
 
     try:
         response = client.invoke_model_with_response_stream(
@@ -80,71 +99,94 @@ def call_bedrock_model(messages):
     except Exception as e:
         return f"Erro ao chamar o modelo: {str(e)}"
 
+
+
+
 # =========================
 # Interface do Chat
 # =========================
-st.title("Chat com AWS Bedrock")
+st.title("TURIST A.I")
+
+
+
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
     context = """
-    
-    *Prompt*: A minha empresa se chama TURIST A.I. Você é um agente de viagens virtual, invente um nome para você a cada interação, e diga que você é da Turist A.I. 
-Utilizando uma linguagem cordial e que seja objetiva, com emojis. Faça ao usuário, as perguntas necessárias para responder às questões abaixo:
-   pergunte que dia ele irá para búzios
-    Tipo de evento :
-    Gêneros musicais favoritos :
-    Atividades preferidas
- 
-Com base nas informações fornecidas pelo usuário, personalize sugestões de eventos, músicas e atividades na cidade de Buzios, baseada nos dados do arquivo eventos-buzios.txt. fale também sobre o tempo, 
-Considere os seguintes, quero que faça uma pergunta por vez, como em uma conversa.
-    
+    *Prompt*: Prompt:
+A minha empresa se chama TURIST A.I. Você é um agente de viagens virtual, invente um nome para você a cada interação, e diga que você é da Turist A.I.
+
+**Objetivo:** Criar um roteiro personalizado para um cliente que viajará para Búzios, considerando suas preferências e os dados do arquivo `eventos-buzios.txt`.
+
+**Linguagem:** Cordial, objetiva e com emojis.
+
+**Estrutura da conversa:**
+
+1. **Apresentação:** Se apresente de forma amigável e pergunte o nome do cliente.
+2. **Data da viagem:** Pergunte as datas da viagem.
+3. **Tipo de evento:** Pergunte se o cliente tem algum tipo de evento especial em mente (aniversário, lua de mel, etc.).
+4. **Preferências:** Pergunte sobre as atividades preferidas do cliente (praia, trilhas, gastronomia, etc.).
+5. **Estilo musical:** Pergunte o estilo musical preferido (opcional, para sugerir shows).
+6. **Outras preferências:** Pergunte se o cliente tem alguma outra preferência (hospedagem, orçamento, etc.).
+7. **Criação do roteiro:** Após coletar todas as informações, acesse o arquivo `eventos-buzios.txt` e uma API de previsão do tempo para criar um roteiro personalizado, incluindo:
+   * **Sugestões de praias e atividades:** Baseadas nas preferências do cliente.
+   * **Eventos:** Shows, festas e outros eventos relevantes para o período da viagem e o estilo musical do cliente.
+   * **Gastronomia:** Sugestões de restaurantes e bares.
+   * **Previsão do tempo:** A previsão do tempo detalhada para cada dia da viagem.
+8. **Apresentação do roteiro:** Apresente o roteiro de forma organizada e atrativa, utilizando emojis e destacando os pontos mais relevantes.
+
+**Exemplo de conversa:**
+
+Olá! Sou a Bia, sua agente de viagens virtual da Turist A.I.  Para te ajudar a planejar sua viagem para Búzios, preciso de algumas informações. Qual o seu nome?
+
+
     """
-    
-    st.session_state.chat_history.append({"role": "user", "content": context, "hidden": True})
+    st.session_state.chat_history.append({"role": "user", "content": context, "hidden": True})  # Adiciona o contexto como oculto
+
 
 user_input = st.text_area("Digite sua mensagem ou personalize o prompt:", key="user_input")
 
-def add_message_to_history(role, content, ):
+
+
+
+def add_message_to_history(role, content, hidden=False):
+
+
     if not hidden:
         if not st.session_state.chat_history or st.session_state.chat_history[-1]["role"] != role:
             st.session_state.chat_history.append({"role": role, "content": content})
     else:
         st.session_state.chat_history.append({"role": role, "content": content, "hidden": True})
 
-st.sidebar.header("Fonte de Dados")
-uploaded_file = st.sidebar.file_uploader("Carregue um arquivo CSV", type=["csv"])
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    data_summary = f"Dados carregados:\n{df.head(5).to_string(index=False)}"
-    add_message_to_history("user", data_summary)
-    st.sidebar.write("**Prévia do arquivo carregado:**")
-    st.sidebar.dataframe(df)
 
-st.sidebar.header("Consulta IBGE")
-name_query = st.sidebar.text_input("Digite um nome para consultar no IBGE:")
-if st.sidebar.button("Consultar IBGE"):
-    ibge_result = get_ibge_info(name_query)
-    add_message_to_history("user", f"Resultado da API IBGE: {ibge_result}")
-    st.sidebar.write("**Resultado da API IBGE:**")
-    st.sidebar.write(ibge_result)
+
+
+
+
+
 
 if st.button("Enviar"):
     if user_input.strip():
         add_message_to_history("user", user_input)
 
+
+
+
         with st.spinner("Buscando resposta..."):
-            model_response = call_bedrock_model(
-                [msg for msg in st.session_state.chat_history if not msg.get("hidden", False)]
-            )
+            model_response = call_bedrock_model(st.session_state.chat_history)
+
 
             add_message_to_history("assistant", model_response)
 
+
+
+
 st.subheader("Histórico do Chat")
 for message in st.session_state.chat_history:
-    if not message.get("hidden", False):
+    if not message.get("hidden", False):  # Mostra apenas mensagens visíveis
         if message["role"] == "user":
             st.write(f"**Usuário:** {message['content']}")
         elif message["role"] == "assistant":
             st.write(f"**Modelo:** {message['content']}")
+
 
