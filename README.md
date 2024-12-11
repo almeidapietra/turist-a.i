@@ -55,22 +55,22 @@ Credenciais Amazon Bedrock
 bashCopy# Clone o repositório
 git clone https://github.com/seu-usuario/turist-ai.git
 
-# Crie um ambiente virtual
+#### Crie um ambiente virtual
 python -m venv .venv
 
-# Ative o ambiente virtual
-# Windows
+#### Ative o ambiente virtual
+##### Windows
 .venv\Scripts\activate
-# Linux/Mac
+##### Linux/Mac
 source .venv/bin/activate
 
-# Instale as dependências
+##### Instale as dependências
 pip install -r requirements.txt
 
-# Execute a aplicação
+##### Execute a aplicação
 streamlit run app.py
 
-## Contribuição
+###### Contribuição
 Contribuições são bem-vindas! Por favor, leia as diretrizes de contribuição antes de enviar seu pull request.
 Licença
 
