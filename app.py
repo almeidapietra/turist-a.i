@@ -8,11 +8,7 @@ import os
 
 
 
-session = boto3.Session(
-    aws_access_key_id='',
-    aws_secret_access_key='',
-    region_name='us-west-2'  
-)
+
 client = session.client('bedrock-runtime', region_name='us-west-2')
 
 
