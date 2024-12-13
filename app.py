@@ -4,20 +4,22 @@ import json
 import pandas as pd
 import requests
 import os
+from dotenv import load_dotenv
 
+#carrega variaveis do .env
+load_dotenv()
 
-
-
-
+#Criando a sessão
+session = boto3.Session(
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.getenv('AWS_REGION')
+)
 client = session.client('bedrock-runtime', region_name='us-west-2')
-
-
-
-
-
-
-
-
+ 
+logo_path="logo.jpg"
+ 
+ 
 # =========================
 # Função para carregar arquivo
 # =========================
@@ -40,10 +42,8 @@ def carregar_eventos(caminho_arquivo):
     except Exception as e:
         st.error(f"Erro ao ler o arquivo: {e}")
         return ""
-
-
-
-
+ 
+ 
 # =========================
 # Função para chamada ao AWS Bedrock
 # =========================
@@ -55,8 +55,7 @@ def call_bedrock_model(messages):
    
     if not eventos:
         eventos = "Nnehum evento em Búzios no Momento"
-
-
+ 
     # Adiciona os eventos ao contexto do primeiro prompt
     if messages and messages[0]["role"] == "user":
         messages[0]["content"] += f"\n\nEventos em Búzios:\n{eventos}"
@@ -69,10 +68,8 @@ def call_bedrock_model(messages):
         "top_p": 0.95,
         "stop_sequences": []
     }
-
-
-
-
+ 
+ 
     try:
         response = client.invoke_model_with_response_stream(
             modelId="anthropic.claude-v2",
@@ -94,89 +91,65 @@ def call_bedrock_model(messages):
         return "".join(output)
     except Exception as e:
         return f"Erro ao chamar o modelo: {str(e)}"
-
-
-
-
+ 
+ 
 # =========================
 # Interface do Chat
 # =========================
-st.title("TURIST A.I")
-
-
-
-
+ 
+if os.path.exists(logo_path):
+    col1, col2 = st.columns([1,9])
+    with col1:
+        st.image(logo_path, width=200)
+    with col2:
+        st.title("TURIST A.I. - Descubra onde ir, sem perder tempo.")
+else:
+    st.error("Logomarca não encontrada.")
+ 
+ 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
     context = """
-    *Prompt*: Prompt:
-A minha empresa se chama TURIST A.I. Você é um agente de viagens virtual, invente um nome para você a cada interação, e diga que você é da Turist A.I.
-
-**Objetivo:** Criar um roteiro personalizado para um cliente que viajará para Búzios, considerando suas preferências e os dados do arquivo `eventos-buzios.txt`.
-
-**Linguagem:** Cordial, objetiva e com emojis.
-
-**Estrutura da conversa:**
-
-1. **Apresentação:** Se apresente de forma amigável e pergunte o nome do cliente.
-2. **Data da viagem:** Pergunte as datas da viagem.
-3. **Tipo de evento:** Pergunte se o cliente tem algum tipo de evento especial em mente (aniversário, lua de mel, etc.).
-4. **Preferências:** Pergunte sobre as atividades preferidas do cliente (praia, trilhas, gastronomia, etc.).
-5. **Estilo musical:** Pergunte o estilo musical preferido (opcional, para sugerir shows).
-6. **Outras preferências:** Pergunte se o cliente tem alguma outra preferência (hospedagem, orçamento, etc.).
-7. **Criação do roteiro:** Após coletar todas as informações, acesse o arquivo `eventos-buzios.txt` e uma API de previsão do tempo para criar um roteiro personalizado, incluindo:
-   * **Sugestões de praias e atividades:** Baseadas nas preferências do cliente.
-   * **Eventos:** Shows, festas e outros eventos relevantes para o período da viagem e o estilo musical do cliente.
-   * **Gastronomia:** Sugestões de restaurantes e bares.
-   * **Previsão do tempo:** A previsão do tempo detalhada para cada dia da viagem.
-8. **Apresentação do roteiro:** Apresente o roteiro de forma organizada e atrativa, utilizando emojis e destacando os pontos mais relevantes.
-
-**Exemplo de conversa:**
-
-Olá! Sou a Bia, sua agente de viagens virtual da Turist A.I.  Para te ajudar a planejar sua viagem para Búzios, preciso de algumas informações. Qual o seu nome?
-
-
+    *Prompt*: A minha empresa se chama TURIST A.I. Você é um agente de viagens virtual, invente um nome para você a cada interação, e diga que você é da Turist A.I.
+    Utilizando uma linguagem cordial e que seja objetiva, com emojis. Faça perguntas ao usuário, as perguntas necessárias para responder às questões abaixo:
+       pergunte que dia ele irá para búzios
+        Tipo de evento :
+        Gêneros musicais favoritos :
+        Atividades preferidas
+ 
+        Faça perguntas diretas, uma pergunta por vez, Se apresente, encante o cliente.
+     
+    Com base nas informações fornecidas pelo usuário, personalize sugestões de eventos, músicas e atividades na cidade de Búzios, baseada nos dados do arquivo eventos-buzios.txt. fale também sobre o tempo,
+    Considere os seguintes, quero que faça uma pergunta por vez, como em uma conversa.
+ 
+    Seu nome é Romário.
+    GUARDRAIL:
+    Atente-se e responda apenas sobre o contexto enviado. Caso o usuário divague ou fale sobre outra coisa, diga que sua base de dados está preparada apenas para falar sobre eventos de Búzios.
     """
     st.session_state.chat_history.append({"role": "user", "content": context, "hidden": True})  # Adiciona o contexto como oculto
-
-
+ 
 user_input = st.text_area("Digite sua mensagem ou personalize o prompt:", key="user_input")
-
-
-
-
+ 
+ 
 def add_message_to_history(role, content, hidden=False):
-
-
+ 
     if not hidden:
         if not st.session_state.chat_history or st.session_state.chat_history[-1]["role"] != role:
             st.session_state.chat_history.append({"role": role, "content": content})
     else:
         st.session_state.chat_history.append({"role": role, "content": content, "hidden": True})
-
-
-
-
-
-
-
-
+ 
 if st.button("Enviar"):
     if user_input.strip():
         add_message_to_history("user", user_input)
-
-
-
-
+ 
+ 
         with st.spinner("Buscando resposta..."):
             model_response = call_bedrock_model(st.session_state.chat_history)
-
-
+ 
             add_message_to_history("assistant", model_response)
-
-
-
-
+ 
+ 
 st.subheader("Histórico do Chat")
 for message in st.session_state.chat_history:
     if not message.get("hidden", False):  # Mostra apenas mensagens visíveis
@@ -184,5 +157,3 @@ for message in st.session_state.chat_history:
             st.write(f"**Usuário:** {message['content']}")
         elif message["role"] == "assistant":
             st.write(f"**Modelo:** {message['content']}")
-
-
